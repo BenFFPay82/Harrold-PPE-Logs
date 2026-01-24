@@ -370,6 +370,46 @@ app.get('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+// Admin SQL endpoint (add this BEFORE the app.listen() line)
+app.post('/api/admin/sql', (req, res) => {
+  const { query } = req.body;
+  
+  if (!query || typeof query !== 'string') {
+    return res.json({ error: 'Invalid query' });
+  }
+
+  // Security check - prevent multiple statements
+  if (query.includes(';') && query.trim().split(';').filter(q => q.trim()).length > 1) {
+    return res.json({ error: 'Multiple statements not allowed' });
+  }
+
+  const trimmedQuery = query.trim().toUpperCase();
+  
+  // Check if it's a SELECT query (returns data)
+  if (trimmedQuery.startsWith('SELECT')) {
+    db.all(query, [], (err, rows) => {
+      if (err) {
+        return res.json({ error: err.message });
+      }
+      res.json({ rows, count: rows.length });
+    });
+  } 
+  // For UPDATE, INSERT, DELETE (modifies data)
+  else if (
+    trimmedQuery.startsWith('UPDATE') || 
+    trimmedQuery.startsWith('INSERT') || 
+    trimmedQuery.startsWith('DELETE')
+  ) {
+    db.run(query, [], function(err) {
+      if (err) {
+        return res.json({ error: err.message });
+      }
+      res.json({ changes: this.changes });
+    });
+  }
+  else {
+    res.json({ error: 'Only SELECT, UPDATE, INSERT, and DELETE queries are supported' });
+  }
+});app.listen(PORT, () => {
   console.log(`Harrold PPE Logs running on http://localhost:${PORT}`);
 });
