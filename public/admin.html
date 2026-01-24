@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Harrold PPE Logs</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #d32f2f;
+      margin-bottom: 10px;
+    }
+
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 20px 0;
+      color: #856404;
+    }
+
+    .section {
+      margin: 30px 0;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      resize: vertical;
+    }
+
+    button {
+      background: #d32f2f;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background: #b71c1c;
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .result.success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+    }
+
+    .result.error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+    }
+
+    .examples {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 15px;
+    }
+
+    .examples h3 {
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: #666;
+    }
+
+    .examples code {
+      display: block;
+      background: white;
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 3px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .examples code:hover {
+      background: #e9ecef;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #d32f2f;
+      text-decoration: none;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="back-link">← Back to PPE Logs</a>
+    
+    <h1>Database Admin</h1>
+    <p style="color: #666; margin-top: 10px;">Direct database access for Harrold PPE Logs</p>
+
+    <div class="warning">
+      <strong>⚠️ Warning:</strong> This page allows direct SQL execution on the live database. 
+      Use carefully - incorrect queries can delete data permanently.
+    </div>
+
+    <div class="section">
+      <h2>Execute SQL Query</h2>
+      <textarea id="sql-query" placeholder="Enter SQL query here...
+Example: UPDATE firefighters SET name = 'M POSTLES' WHERE employee_no = 'MO0918986';"></textarea>
+      <button id="execute-btn" onclick="executeQuery()">Execute Query</button>
+      <div id="result"></div>
+    </div>
+
+    <div class="examples">
+      <h3>Common Queries (click to use):</h3>
+      
+      <code onclick="useQuery(this)">SELECT * FROM firefighters;</code>
+      <code onclick="useQuery(this)">UPDATE firefighters SET name = 'M POSTLES' WHERE employee_no = 'MO0918986';</code>
+      <code onclick="useQuery(this)">UPDATE firefighters SET name = 'S POSTLES' WHERE employee_no = 'BO0000827';</code>
+      <code onclick="useQuery(this)">SELECT * FROM equipment LIMIT 10;</code>
+      <code onclick="useQuery(this)">SELECT * FROM checks ORDER BY completed_at DESC LIMIT 10;</code>
+    </div>
+  </div>
+
+  <script>
+    function useQuery(element) {
+      document.getElementById('sql-query').value = element.textContent;
+    }
+
+    async function executeQuery() {
+      const query = document.getElementById('sql-query').value.trim();
+      const resultDiv = document.getElementById('result');
+      const executeBtn = document.getElementById('execute-btn');
+
+      if (!query) {
+        alert('Please enter a SQL query');
+        return;
+      }
+
+      executeBtn.disabled = true;
+      executeBtn.textContent = 'Executing...';
+      resultDiv.innerHTML = '';
+
+      try {
+        const response = await fetch('/api/admin/sql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ query })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+          resultDiv.className = 'result error';
+          resultDiv.textContent = 'Error: ' + data.error;
+        } else {
+          resultDiv.className = 'result success';
+          
+          if (data.rows && data.rows.length > 0) {
+            resultDiv.textContent = 'Success! ' + data.rows.length + ' row(s) returned:\n\n' + 
+              JSON.stringify(data.rows, null, 2);
+          } else if (data.changes !== undefined) {
+            resultDiv.textContent = 'Success! ' + data.changes + ' row(s) affected.';
+          } else {
+            resultDiv.textContent = 'Query executed successfully.';
+          }
+        }
+      } catch (err) {
+        resultDiv.className = 'result error';
+        resultDiv.textContent = 'Error: ' + err.message;
+      } finally {
+        executeBtn.disabled = false;
+        executeBtn.textContent = 'Execute Query';
+      }
+    }
+
+    // Allow Enter key to execute (with Cmd/Ctrl modifier)
+    document.getElementById('sql-query').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        executeQuery();
+      }
+    });
+  </script>
+</body>
+</html>
