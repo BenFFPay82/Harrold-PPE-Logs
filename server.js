@@ -410,6 +410,8 @@ app.post('/api/admin/sql', (req, res) => {
   else {
     res.json({ error: 'Only SELECT, UPDATE, INSERT, and DELETE queries are supported' });
   }
-});app.listen(PORT, () => {
+});
+app.listen(PORT, () => {
   console.log(`Harrold PPE Logs running on http://localhost:${PORT}`);
 });
+
