@@ -1,0 +1,22 @@
+{
+  "name": "harrold-ppe-logs",
+  "version": "1.0.0",
+  "description": "PPE inspection logging for Harrold Community Fire Station",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "import": "node scripts/import-csv.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.8",
+    "csv-parse": "^5.5.3",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

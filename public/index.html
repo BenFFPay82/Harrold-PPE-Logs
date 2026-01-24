@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Harrold PPE Logs</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Harrold PPE Logs</h1>
+    <nav id="nav">
+      <button class="nav-btn active" data-view="check">Monthly Check</button>
+      <button class="nav-btn" data-view="dashboard">Dashboard</button>
+      <button class="nav-btn" data-view="history">History</button>
+    </nav>
+  </header>
+
+  <main id="app">
+    <!-- Monthly Check View -->
+    <section id="view-check" class="view active">
+      <div id="firefighter-select" class="card">
+        <h2>Select Your Name</h2>
+        <div id="firefighter-list" class="firefighter-grid"></div>
+      </div>
+
+      <div id="equipment-check" class="card hidden">
+        <div class="check-header">
+          <h2>Monthly Check - <span id="selected-name"></span></h2>
+          <p class="month-label" id="check-month"></p>
+        </div>
+        <form id="check-form">
+          <div id="equipment-list"></div>
+          <button type="submit" class="btn btn-primary btn-large">Submit Check</button>
+        </form>
+      </div>
+
+      <div id="check-complete" class="card hidden">
+        <div class="success-message">
+          <svg class="checkmark" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="25" fill="none"/>
+            <path fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+          </svg>
+          <h2>Check Complete!</h2>
+          <p>Your monthly PPE inspection has been recorded.</p>
+          <button class="btn" onclick="location.reload()">Done</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dashboard View -->
+    <section id="view-dashboard" class="view hidden">
+      <div class="card">
+        <div class="dashboard-header">
+          <h2>Dashboard</h2>
+          <div class="month-selector">
+            <label for="dashboard-month">Month:</label>
+            <input type="month" id="dashboard-month">
+          </div>
+        </div>
+
+        <div id="dashboard-summary" class="summary-cards"></div>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Firefighter</th>
+              <th>Status</th>
+              <th>Completed</th>
+              <th>Defects</th>
+            </tr>
+          </thead>
+          <tbody id="dashboard-table"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>Quarterly Audit</h3>
+        <div class="quarter-selector">
+          <label for="audit-quarter">Quarter:</label>
+          <select id="audit-quarter"></select>
+          <button class="btn" id="load-quarter-btn">Load</button>
+        </div>
+        <div id="quarterly-data"></div>
+      </div>
+    </section>
+
+    <!-- History View -->
+    <section id="view-history" class="view hidden">
+      <div class="card">
+        <div class="history-header">
+          <h2>Historical Records</h2>
+          <div class="month-selector">
+            <label for="history-month">Month:</label>
+            <input type="month" id="history-month">
+          </div>
+        </div>
+
+        <div id="history-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Harrold Community Fire Station</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
