@@ -385,33 +385,31 @@ app.post('/api/admin/sql', (req, res) => {
 
   const trimmedQuery = query.trim().toUpperCase();
   
-  // Check if it's a SELECT query (returns data)
-  if (trimmedQuery.startsWith('SELECT')) {
-    db.all(query, [], (err, rows) => {
-      if (err) {
-        return res.json({ error: err.message });
-      }
+  try {
+    // Check if it's a SELECT query (returns data)
+    if (trimmedQuery.startsWith('SELECT')) {
+      const rows = db.prepare(query).all();
       res.json({ rows, count: rows.length });
-    });
-  } 
-  // For UPDATE, INSERT, DELETE (modifies data)
-  else if (
-    trimmedQuery.startsWith('UPDATE') || 
-    trimmedQuery.startsWith('INSERT') || 
-    trimmedQuery.startsWith('DELETE')
-  ) {
-    db.run(query, [], function(err) {
-      if (err) {
-        return res.json({ error: err.message });
-      }
-      res.json({ changes: this.changes });
-    });
-  }
-  else {
-    res.json({ error: 'Only SELECT, UPDATE, INSERT, and DELETE queries are supported' });
+    } 
+    // For UPDATE, INSERT, DELETE (modifies data)
+    else if (
+      trimmedQuery.startsWith('UPDATE') || 
+      trimmedQuery.startsWith('INSERT') || 
+      trimmedQuery.startsWith('DELETE')
+    ) {
+      const result = db.prepare(query).run();
+      res.json({ changes: result.changes });
+    }
+    else {
+      res.json({ error: 'Only SELECT, UPDATE, INSERT, and DELETE queries are supported' });
+    }
+  } catch (err) {
+    res.json({ error: err.message });
   }
 });
-app.listen(PORT, () => {
-  console.log(`Harrold PPE Logs running on http://localhost:${PORT}`);
+
+// Serve the app (catch-all MUST be last)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
