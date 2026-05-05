@@ -30,10 +30,27 @@
           <h2>Monthly Check - <span id="selected-name"></span></h2>
           <p class="month-label" id="check-month"></p>
         </div>
+        <div class="scan-bar">
+          <button type="button" id="scan-btn" class="btn btn-primary scan-btn">
+            <span class="scan-icon">&#128247;</span> Scan Barcode
+          </button>
+          <p class="scan-hint">Scan each item, then mark Good or Defect. Anything not scanned must be marked Missing, Condemned or Away for cleaning before submitting.</p>
+        </div>
         <form id="check-form">
           <div id="equipment-list"></div>
           <button type="submit" class="btn btn-primary btn-large">Submit Check</button>
         </form>
+      </div>
+
+      <div id="scanner-modal" class="scanner-modal hidden">
+        <div class="scanner-content">
+          <div class="scanner-header">
+            <h3>Scan PPE Barcode</h3>
+            <button type="button" id="scanner-close" class="scanner-close" aria-label="Close">&times;</button>
+          </div>
+          <video id="scanner-video" playsinline muted></video>
+          <p id="scanner-status" class="scanner-status">Point the camera at a barcode...</p>
+        </div>
       </div>
 
       <div id="check-complete" class="card hidden">
@@ -106,6 +123,7 @@
     <p>Harrold Community Fire Station</p>
   </footer>
 
+  <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

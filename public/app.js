@@ -51,6 +51,26 @@ function getEquipmentTypeLabel(type) {
   return labels[type] || type;
 }
 
+const CONDITION_LABELS = {
+  good: 'Good',
+  defect: 'Defect',
+  missing: 'Missing',
+  condemned: 'Condemned',
+  cleaning: 'Away for cleaning'
+};
+
+const CONDITION_BUTTONS = [
+  { value: 'good', label: 'Good' },
+  { value: 'defect', label: 'Defect' },
+  { value: 'missing', label: 'Missing' },
+  { value: 'condemned', label: 'Condemned' },
+  { value: 'cleaning', label: 'Cleaning' }
+];
+
+function normaliseBarcode(s) {
+  return (s || '').toString().trim().toUpperCase();
+}
+
 // API calls
 async function api(endpoint, options = {}) {
   const res = await fetch(`/api${endpoint}`, {
@@ -119,9 +139,9 @@ async function selectFirefighter(id) {
   state.equipment = await api(`/firefighters/${id}/equipment`);
   state.itemStates = {};
 
-  // Initialize all items as 'good'
+  // Items start unchecked — user must scan or assign a status before submitting
   state.equipment.forEach(eq => {
-    state.itemStates[eq.barcode] = { condition: 'good', notes: '', photo: null };
+    state.itemStates[eq.barcode] = { condition: null, notes: '', photo: null };
   });
 
   $('#selected-name').textContent = ff.name;
@@ -147,24 +167,32 @@ function renderEquipmentList() {
   for (const [type, items] of Object.entries(grouped)) {
     items.forEach(eq => {
       const itemState = state.itemStates[eq.barcode];
-      const isDefect = itemState.condition === 'defect';
+      const cond = itemState.condition;
+      const showDefectDetails = cond === 'defect';
+
+      const buttons = CONDITION_BUTTONS.map(b => `
+        <button type="button" class="condition-btn ${b.value} ${cond === b.value ? 'selected' : ''}"
+                data-barcode="${eq.barcode}" data-condition="${b.value}">${b.label}</button>
+      `).join('');
+
+      const statusPill = cond
+        ? `<span class="status-pill status-${cond}">${CONDITION_LABELS[cond]}</span>`
+        : `<span class="status-pill status-unchecked">Not yet checked</span>`;
 
       html += `
-        <div class="equipment-item ${isDefect ? 'defect' : ''}" data-barcode="${eq.barcode}">
+        <div class="equipment-item status-${cond || 'unchecked'}" data-barcode="${eq.barcode}">
           <div class="equipment-header">
             <div class="equipment-info">
               <h4>${getEquipmentTypeLabel(eq.type)}</h4>
               <div class="meta">${eq.description}${eq.size ? ` | Size: ${eq.size}` : ''}</div>
               <div class="meta">Barcode: ${eq.barcode}</div>
-            </div>
-            <div class="condition-toggle">
-              <button type="button" class="condition-btn good ${!isDefect ? 'selected' : ''}"
-                      data-barcode="${eq.barcode}" data-condition="good">Good</button>
-              <button type="button" class="condition-btn defect ${isDefect ? 'selected' : ''}"
-                      data-barcode="${eq.barcode}" data-condition="defect">Defect</button>
+              ${statusPill}
             </div>
           </div>
-          <div class="defect-details ${isDefect ? '' : 'hidden'}">
+          <div class="condition-toggle">
+            ${buttons}
+          </div>
+          <div class="defect-details ${showDefectDetails ? '' : 'hidden'}">
             <label>Defect Notes:</label>
             <textarea placeholder="Describe the defect..."
                       data-barcode="${eq.barcode}">${itemState.notes}</textarea>
@@ -209,23 +237,108 @@ function setItemCondition(barcode, condition) {
   state.itemStates[barcode].condition = condition;
 
   const item = $(`.equipment-item[data-barcode="${barcode}"]`);
-  const goodBtn = item.querySelector('.condition-btn.good');
-  const defectBtn = item.querySelector('.condition-btn.defect');
+  if (!item) return;
+
+  item.className = `equipment-item status-${condition}`;
+
+  item.querySelectorAll('.condition-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.condition === condition);
+  });
+
+  const pill = item.querySelector('.status-pill');
+  if (pill) {
+    pill.className = `status-pill status-${condition}`;
+    pill.textContent = CONDITION_LABELS[condition];
+  }
+
   const details = item.querySelector('.defect-details');
+  details.classList.toggle('hidden', condition !== 'defect');
 
-  item.classList.toggle('defect', condition === 'defect');
-  goodBtn.classList.toggle('selected', condition === 'good');
-  defectBtn.classList.toggle('selected', condition === 'defect');
-  details.classList.toggle('hidden', condition === 'good');
-
-  if (condition === 'good') {
+  if (condition !== 'defect') {
     state.itemStates[barcode].notes = '';
     state.itemStates[barcode].photo = null;
+    const ta = details.querySelector('textarea');
+    const fi = details.querySelector('input[type="file"]');
+    if (ta) ta.value = '';
+    if (fi) fi.value = '';
   }
+}
+
+function flashItemRow(barcode) {
+  const item = $(`.equipment-item[data-barcode="${barcode}"]`);
+  if (!item) return;
+  item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  item.classList.remove('flash');
+  void item.offsetWidth;
+  item.classList.add('flash');
+}
+
+// Barcode scanner
+let scannerControls = null;
+
+async function openScanner() {
+  const modal = $('#scanner-modal');
+  const video = $('#scanner-video');
+  const status = $('#scanner-status');
+
+  if (!window.ZXingBrowser) {
+    alert('Barcode scanner library failed to load. Check your internet connection and refresh.');
+    return;
+  }
+
+  modal.classList.remove('hidden');
+  status.textContent = 'Starting camera...';
+
+  try {
+    const reader = new ZXingBrowser.BrowserMultiFormatReader();
+    const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+    const rear = devices.find(d => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
+    const deviceId = rear ? rear.deviceId : undefined;
+
+    status.textContent = 'Point the camera at a barcode...';
+
+    scannerControls = await reader.decodeFromVideoDevice(deviceId, video, (result) => {
+      if (result) {
+        const code = normaliseBarcode(result.getText());
+        handleScannedBarcode(code);
+      }
+    });
+  } catch (err) {
+    console.error('Scanner error:', err);
+    status.textContent = 'Camera unavailable: ' + (err.message || err);
+  }
+}
+
+function closeScanner() {
+  const modal = $('#scanner-modal');
+  modal.classList.add('hidden');
+  if (scannerControls) {
+    try { scannerControls.stop(); } catch (e) { /* ignore */ }
+    scannerControls = null;
+  }
+  $('#scanner-status').textContent = '';
+}
+
+function handleScannedBarcode(code) {
+  const match = state.equipment.find(eq => normaliseBarcode(eq.barcode) === code);
+  if (!match) {
+    $('#scanner-status').textContent = `Barcode "${code}" doesn't match any of your PPE.`;
+    return;
+  }
+  closeScanner();
+  flashItemRow(match.barcode);
 }
 
 async function submitCheck(e) {
   e.preventDefault();
+
+  const unchecked = state.equipment.filter(eq => !state.itemStates[eq.barcode].condition);
+  if (unchecked.length > 0) {
+    const first = unchecked[0];
+    flashItemRow(first.barcode);
+    alert(`${unchecked.length} item${unchecked.length > 1 ? 's' : ''} not yet checked. Scan or mark each as Good, Defect, Missing, Condemned, or Cleaning before submitting.`);
+    return;
+  }
 
   const btn = e.target.querySelector('button[type="submit"]');
   btn.disabled = true;
@@ -452,6 +565,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Check form
   $('#check-form').addEventListener('submit', submitCheck);
+
+  // Scanner
+  $('#scan-btn').addEventListener('click', openScanner);
+  $('#scanner-close').addEventListener('click', closeScanner);
+  $('#scanner-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'scanner-modal') closeScanner();
+  });
 
   // Load initial data
   loadFirefighters();
