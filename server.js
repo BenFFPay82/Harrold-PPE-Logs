@@ -2,7 +2,6 @@ const express = require('express');
 const path = require('path');
 const { Pool } = require('pg');
 const multer = require('multer');
-const nodemailer = require('nodemailer');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -88,41 +87,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 
-// ========== Email ==========
-let transporter = null;
-if (process.env.EMAIL_HOST) {
-  transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT || 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
-}
-
-async function sendEmail(subject, html) {
-  if (!transporter) {
-    console.log('Email not configured. Would send:', subject);
-    return;
-  }
-  try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_TO || 'ben.paynter@bedsfire.gov.uk',
-      subject,
-      html
-    });
-  } catch (err) {
-    console.error('Email error:', err.message);
-  }
-}
-
 // ========== Helpers ==========
-function getUKTime() {
-  return new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' });
-}
 function getCurrentMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -206,7 +171,6 @@ app.post('/api/checks', upload.any(), async (req, res) => {
     const { firefighter_id, month, items } = req.body;
     const parsedItems = JSON.parse(items);
 
-    const firefighter = await get(`SELECT name FROM firefighters WHERE id = $1`, [firefighter_id]);
     const existing = await get(
       `SELECT id FROM monthly_checks WHERE firefighter_id = $1 AND month = $2`,
       [firefighter_id, month]
@@ -232,7 +196,6 @@ app.post('/api/checks', upload.any(), async (req, res) => {
       }
     }
 
-    const defects = [];
     for (const item of parsedItems) {
       const photoUrl = uploadedFiles[`photo_${item.barcode}`] || null;
       await client.query(
@@ -240,32 +203,9 @@ app.post('/api/checks', upload.any(), async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [uuidv4(), checkId, item.barcode, item.condition, item.notes || null, photoUrl, completedAt]
       );
-      if (item.condition === 'defect') {
-        defects.push({
-          barcode: item.barcode,
-          description: item.description,
-          notes: item.notes,
-          photoUrl
-        });
-      }
     }
 
     await client.query('COMMIT');
-
-    if (defects.length > 0) {
-      const defectList = defects.map(d =>
-        `<li><strong>${d.description}</strong> (${d.barcode})<br>Notes: ${d.notes || 'None'}${d.photoUrl ? `<br><a href="${d.photoUrl}">View Photo</a>` : ''}</li>`
-      ).join('');
-      await sendEmail(
-        `PPE Defect Report - ${firefighter?.name || 'Unknown'}`,
-        `<h2>PPE Defect Reported</h2>
-         <p><strong>Firefighter:</strong> ${firefighter?.name || 'Unknown'}</p>
-         <p><strong>Date:</strong> ${getUKTime()}</p>
-         <p><strong>Month:</strong> ${month}</p>
-         <h3>Defects Found:</h3>
-         <ul>${defectList}</ul>`
-      );
-    }
 
     res.json({ success: true, checkId });
   } catch (err) {
